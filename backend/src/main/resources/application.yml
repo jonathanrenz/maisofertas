@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: maisofertas-backend
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:maisofertas}
+    username: ${DB_USER:maisofertas}
+    password: ${DB_PASSWORD:maisofertas}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  deals:
+    dedup-window-days: ${DEAL_DEDUP_WINDOW_DAYS:7}
+  publish:
+    interval-ms: ${PUBLISH_INTERVAL_MS:300000}
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-5-nano}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+  evolution:
+    base-url: ${EVOLUTION_BASE_URL:http://localhost:8080}
+    instance: ${EVOLUTION_INSTANCE:maisofertas}
+    api-key: ${EVOLUTION_API_KEY:}
+    group-jid: ${EVOLUTION_GROUP_JID:}
+  amazon:
+    sync:
+      enabled: ${AMAZON_SYNC_ENABLED:false}

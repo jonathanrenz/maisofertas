@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: maisofertas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-maisofertas}
+      POSTGRES_USER: ${DB_USER:-maisofertas}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - maisofertas-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: maisofertas-redis
+    restart: unless-stopped
+    networks:
+      - maisofertas-network
+
+  evolution-api:
+    image: evolutionapi/evolution-api:latest
+    container_name: maisofertas-evolution-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${DB_USER:-maisofertas}:${DB_PASSWORD:?defina DB_PASSWORD no .env}@postgres:5432/evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?defina EVOLUTION_API_KEY no .env}
+      SERVER_PORT: 8080
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - maisofertas-network
+
+  app:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: maisofertas-app
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-maisofertas}
+      DB_USER: ${DB_USER:-maisofertas}
+      DB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      DEAL_DEDUP_WINDOW_DAYS: ${DEAL_DEDUP_WINDOW_DAYS:-7}
+      PUBLISH_INTERVAL_MS: ${PUBLISH_INTERVAL_MS:-300000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-nano}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      EVOLUTION_BASE_URL: http://evolution-api:8080
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-maisofertas}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_GROUP_JID: ${EVOLUTION_GROUP_JID:-}
+      AMAZON_SYNC_ENABLED: ${AMAZON_SYNC_ENABLED:-false}
+    depends_on:
+      - postgres
+      - evolution-api
+    networks:
+      - maisofertas-network
+
+networks:
+  maisofertas-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
