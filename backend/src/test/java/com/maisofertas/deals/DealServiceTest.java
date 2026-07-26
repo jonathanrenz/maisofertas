@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class DealServiceTest {
 
     private final DealRepository repository = mock(DealRepository.class);
-    private final DealService service = new DealService(repository, 7);
+    private final DealService service = new DealService(repository, 7, "");
 
     private CreateDealRequest sampleRequest() {
         return new CreateDealRequest("Livro de autoconfiança", "https://amazon.com.br/dp/ABC123",
@@ -94,5 +94,57 @@ class DealServiceTest {
         List<Deal> pending = service.findPending();
 
         assertThat(pending).containsExactly(deal);
+    }
+
+    @Test
+    void aplicaTagDeAfiliadoQuandoUrlNaoTemQueryString() {
+        DealService withTag = new DealService(repository, 7, "maisoferta0e0-20");
+        when(repository.existsByUrlAndCreatedAtAfter(anyString(), any(Instant.class))).thenReturn(false);
+        when(repository.save(any(Deal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateDealRequest request = new CreateDealRequest("Produto", "https://amazon.com.br/dp/ABC123",
+                null, BigDecimal.TEN, null, Store.AMAZON);
+
+        Deal saved = withTag.createDeal(request, DealSource.MANUAL);
+
+        assertThat(saved.getUrl()).isEqualTo("https://amazon.com.br/dp/ABC123?tag=maisoferta0e0-20");
+    }
+
+    @Test
+    void aplicaTagDeAfiliadoComEComercialQuandoUrlJaTemQueryString() {
+        DealService withTag = new DealService(repository, 7, "maisoferta0e0-20");
+        when(repository.existsByUrlAndCreatedAtAfter(anyString(), any(Instant.class))).thenReturn(false);
+        when(repository.save(any(Deal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateDealRequest request = new CreateDealRequest("Produto", "https://amazon.com.br/dp/ABC123?psc=1",
+                null, BigDecimal.TEN, null, Store.AMAZON);
+
+        Deal saved = withTag.createDeal(request, DealSource.MANUAL);
+
+        assertThat(saved.getUrl()).isEqualTo("https://amazon.com.br/dp/ABC123?psc=1&tag=maisoferta0e0-20");
+    }
+
+    @Test
+    void naoSobrescreveTagQuandoUrlJaTraiUmaExplicita() {
+        DealService withTag = new DealService(repository, 7, "maisoferta0e0-20");
+        when(repository.existsByUrlAndCreatedAtAfter(anyString(), any(Instant.class))).thenReturn(false);
+        when(repository.save(any(Deal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateDealRequest request = new CreateDealRequest("Produto",
+                "https://amazon.com.br/dp/ABC123?tag=outra-tag-20", null, BigDecimal.TEN, null, Store.AMAZON);
+
+        Deal saved = withTag.createDeal(request, DealSource.MANUAL);
+
+        assertThat(saved.getUrl()).isEqualTo("https://amazon.com.br/dp/ABC123?tag=outra-tag-20");
+    }
+
+    @Test
+    void naoAplicaTagQuandoNenhumaEstaConfigurada() {
+        when(repository.existsByUrlAndCreatedAtAfter(anyString(), any(Instant.class))).thenReturn(false);
+        when(repository.save(any(Deal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Deal saved = service.createDeal(sampleRequest(), DealSource.MANUAL);
+
+        assertThat(saved.getUrl()).isEqualTo("https://amazon.com.br/dp/ABC123");
     }
 }

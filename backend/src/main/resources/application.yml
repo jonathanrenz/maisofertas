@@ -31,5 +31,6 @@ app:
     api-key: ${EVOLUTION_API_KEY:}
     group-jid: ${EVOLUTION_GROUP_JID:}
   amazon:
+    associate-tag: ${AMAZON_ASSOCIATE_TAG:}
     sync:
       enabled: ${AMAZON_SYNC_ENABLED:false}
