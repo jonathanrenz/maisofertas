@@ -17,13 +17,17 @@ services:
     image: redis:7-alpine
     container_name: maisofertas-redis
     restart: unless-stopped
+    profiles:
+      - whatsapp
     networks:
       - maisofertas-network
 
   evolution-api:
-    image: evolutionapi/evolution-api:latest
+    image: atendai/evolution-api:v2.2.0
     container_name: maisofertas-evolution-api
     restart: unless-stopped
+    profiles:
+      - whatsapp
     ports:
       - "8080:8080"
     environment:
@@ -67,7 +71,6 @@ services:
       AMAZON_SYNC_ENABLED: ${AMAZON_SYNC_ENABLED:-false}
     depends_on:
       - postgres
-      - evolution-api
     networks:
       - maisofertas-network
 

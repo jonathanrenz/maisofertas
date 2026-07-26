@@ -50,8 +50,15 @@ cp .env.example .env            # preencha as chaves reais
 docker compose up -d --build
 ```
 
+Por padrão sobe só Postgres + app (fluxo Telegram-only). Redis e Evolution API (WhatsApp) ficam atrás
+do profile `whatsapp` — só sobem com:
+
+```bash
+docker compose --profile whatsapp up -d --build
+```
+
 - App: `http://localhost:8081`
-- Evolution API (manager/QR code): `http://localhost:8080`
+- Evolution API (manager/QR code, só com o profile `whatsapp` ativo): `http://localhost:8080`
 
 ### Rodando o eval de qualidade da legenda (chamada real e paga à OpenAI)
 
@@ -93,12 +100,17 @@ Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram e 
 
 ## Antes de ir pra produção (checklist da Fase 0)
 
-1. Cadastro de Associados Amazon aprovado → SiteStripe habilitado para gerar link manual.
-2. Canal do Telegram criado + bot via @BotFather, bot como admin do canal → `TELEGRAM_BOT_TOKEN` e
-   `TELEGRAM_CHAT_ID`.
-3. Número dedicado para o WhatsApp (não usar o pessoal — risco de ban recai só nesse número).
-4. VPS com Docker, `docker compose up -d`, escanear QR do Evolution API, entrar no grupo de ofertas →
-   pegar o JID do grupo para `EVOLUTION_GROUP_JID`.
+1. Canal do Telegram criado + bot via @BotFather, bot como admin do canal → `TELEGRAM_BOT_TOKEN` e
+   `TELEGRAM_CHAT_ID`. Publique algumas ofertas reais (`POST /deals/manual`) antes do passo 2, pra ter
+   conteúdo no canal quando a Amazon revisar o cadastro.
+2. Cadastro de Associados Amazon aprovado, usando a URL pública do canal (`https://t.me/seu_canal`) no
+   campo "site ou app" → SiteStripe habilitado para gerar link manual.
+3. (Opcional, fora do Fase 0 inicial) WhatsApp: número dedicado (não usar o pessoal — risco de ban
+   recai só nesse número), subir com `docker compose --profile whatsapp up -d`, escanear QR do
+   Evolution API, entrar no grupo de ofertas → pegar o JID do grupo para `EVOLUTION_GROUP_JID`. Sem
+   isso configurado, o `PublishOrchestrator` só publica no Telegram (WhatsApp fica com erro esperado
+   nos logs, sem travar o resto do pipeline).
+4. VPS com Docker pra rodar 24/7 (hoje só documentado rodando local).
 5. Chave da OpenAI → `OPENAI_API_KEY`. Sem ela, o app funciona normalmente com o fallback determinístico.
 
 ## Fase 1 (quando destravar API da Amazon)
