@@ -103,4 +103,37 @@ class CanopyClientTest {
 
         assertThat(deals).isEmpty();
     }
+
+    @Test
+    void tratraUrlDeImagemComUndefinedComoAusente() {
+        String responseComImagemQuebrada = """
+                {
+                  "data": {
+                    "amazonDeals": {
+                      "productResults": {
+                        "results": [
+                          {
+                            "title": "Kit Rapunzel (Shampoo + Tonico + Milk Spray)",
+                            "url": "https://www.amazon.com.br/dp/B0EXAMPLE",
+                            "asin": "B0EXAMPLE",
+                            "price": {"symbol":"R$","value":89.9,"currency":"BRL","display":"R$89.9"},
+                            "mainImageUrl": "https://m.media-amazon.com/images/I/undefined.jpg",
+                            "dealListPrice": {"symbol":"R$","value":129.9,"currency":"BRL","display":"R$129.9"},
+                            "dealPercentOff": 30
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """;
+        server.expect(requestTo("https://rest.canopyapi.co/api/amazon/deals?domain=BR&page=3"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(responseComImagemQuebrada, MediaType.APPLICATION_JSON));
+
+        List<CanopyDeal> deals = client.fetchDeals(3);
+
+        assertThat(deals).hasSize(1);
+        assertThat(deals.get(0).imageUrl()).isNull();
+    }
 }

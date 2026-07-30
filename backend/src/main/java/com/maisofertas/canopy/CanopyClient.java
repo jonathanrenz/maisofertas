@@ -56,10 +56,25 @@ public class CanopyClient {
                 raw.asin(),
                 raw.title(),
                 raw.url(),
-                raw.mainImageUrl(),
+                sanitizeImageUrl(raw.mainImageUrl()),
                 raw.price() != null ? raw.price().value() : null,
                 raw.dealListPrice() != null ? raw.dealListPrice().value() : null,
                 raw.dealPercentOff() != null ? raw.dealPercentOff() : 0);
+    }
+
+    /**
+     * A Canopy API às vezes falha ao resolver a imagem do produto e devolve
+     * a URL com um {@code undefined} literal (ex:
+     * {@code .../images/I/undefined.jpg}) em vez de omitir o campo. Telegram
+     * rejeita essa URL com 400 ao tentar buscar a "foto", travando o deal em
+     * retry eterno. Tratamos como ausente para cair no fallback de texto puro
+     * que {@code TelegramBotClient} já tem pra quando não há imagem.
+     */
+    private static String sanitizeImageUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.contains("undefined")) {
+            return null;
+        }
+        return imageUrl;
     }
 
     record RawResponse(RawData data) {
