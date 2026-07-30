@@ -16,21 +16,23 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Eval de qualidade da legenda gerada pela OpenAI de verdade (chamada real,
+ * Eval de qualidade do conteúdo gerado pela OpenAI de verdade (chamada real,
  * paga). Não roda no {@code mvn test} normal (gate lane) — só quando
  * {@code OPENAI_API_KEY} está definida e você pede a tag explicitamente:
  *
  * <pre>mvn test -Dgroups=eval</pre>
  *
- * Rubrica por item: tem emoji, menciona o preço, tamanho cabe no limite de
- * legenda do Telegram/WhatsApp, não deixa placeholder do template vazando.
- * Threshold de aprovação: 90% dos itens passando em todos os critérios.
+ * Rubrica por item: hook não vazio com emoji e sem preço, productName não
+ * vazio, specs (quando existem) só reaproveitam palavras do título — ou seja,
+ * não inventa característica. Threshold de aprovação: 90% dos itens passando
+ * em todos os critérios.
  */
 @Tag("eval")
 @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
-class OpenAiCaptionGeneratorEvalTest {
+class OpenAiDealContentGeneratorEvalTest {
 
     private static final double PASS_THRESHOLD = 0.90;
     private static final Pattern EMOJI_PATTERN = Pattern.compile("[\\p{So}\\p{Cn}\\x{1F300}-\\x{1FAFF}]");
@@ -57,24 +59,24 @@ class OpenAiCaptionGeneratorEvalTest {
     }
 
     @Test
-    void legendasGeradasPassamNaRubricaDeQualidade() {
+    void conteudoGeradoPassaNaRubricaDeQualidade() {
         String apiKey = System.getenv("OPENAI_API_KEY");
         String model = System.getenv().getOrDefault("OPENAI_MODEL", "gpt-5-nano");
         String baseUrl = System.getenv().getOrDefault("OPENAI_BASE_URL", "https://api.openai.com/v1");
 
-        OpenAiCaptionGenerator generator = new OpenAiCaptionGenerator(
-                RestClient.builder(), baseUrl, apiKey, model, new FallbackCaptionGenerator());
+        OpenAiDealContentGenerator generator = new OpenAiDealContentGenerator(
+                RestClient.builder(), baseUrl, apiKey, model,
+                new FallbackDealContentGenerator(), new ObjectMapper());
 
         List<String> failures = new ArrayList<>();
         int passed = 0;
 
         for (Fixture fixture : FIXTURES) {
-            String url = "https://amazon.com.br/dp/TESTE?tag=maisoferta0e0-20";
             Deal deal = Deal.builder()
                     .id(UUID.randomUUID())
                     .store(Store.AMAZON)
                     .title(fixture.title())
-                    .url(url)
+                    .url("https://amazon.com.br/dp/TESTE?tag=maisoferta0e0-20")
                     .price(fixture.price())
                     .originalPrice(fixture.originalPrice())
                     .source(DealSource.MANUAL)
@@ -82,13 +84,15 @@ class OpenAiCaptionGeneratorEvalTest {
                     .createdAt(Instant.now())
                     .build();
 
-            String caption = generator.generateCaption(deal);
-            List<String> reasons = rubricFailures(caption, fixture, url);
+            DealContent content = generator.generateContent(deal);
+            List<String> reasons = rubricFailures(content, fixture);
 
             if (reasons.isEmpty()) {
                 passed++;
             } else {
-                failures.add("\"%s\" -> %s | legenda: %s".formatted(fixture.title(), reasons, caption));
+                failures.add("\"%s\" -> %s | hook: %s | productName: %s | specs: %s"
+                        .formatted(fixture.title(), reasons, content.hook(), content.productName(),
+                                content.specs()));
             }
         }
 
@@ -99,28 +103,31 @@ class OpenAiCaptionGeneratorEvalTest {
         assertThat(passRate).as(report).isGreaterThanOrEqualTo(PASS_THRESHOLD);
     }
 
-    private List<String> rubricFailures(String caption, Fixture fixture, String url) {
+    private List<String> rubricFailures(DealContent content, Fixture fixture) {
         List<String> reasons = new ArrayList<>();
 
-        if (caption == null || caption.isBlank()) {
-            reasons.add("legenda vazia");
+        if (content.hook() == null || content.hook().isBlank()) {
+            reasons.add("hook vazio");
             return reasons;
         }
-        if (!caption.contains(url)) {
-            reasons.add("não contém o link de afiliado (" + url + ")");
+        if (!EMOJI_PATTERN.matcher(content.hook()).find()) {
+            reasons.add("hook sem emoji");
         }
-        if (!EMOJI_PATTERN.matcher(caption).find()) {
-            reasons.add("sem emoji");
-        }
-        if (caption.length() < 15 || caption.length() > 1024) {
-            reasons.add("tamanho fora do limite (%d chars)".formatted(caption.length()));
+        if (content.hook().length() > 150) {
+            reasons.add("hook longo demais (%d chars)".formatted(content.hook().length()));
         }
         String priceDigits = fixture.price().setScale(0, java.math.RoundingMode.DOWN).toBigInteger().toString();
-        if (!caption.contains(priceDigits)) {
-            reasons.add("não menciona o preço (" + priceDigits + ")");
+        if (content.hook().contains(priceDigits)) {
+            reasons.add("hook menciona preço, e não deveria");
         }
-        if (caption.contains("%s") || caption.toLowerCase().contains("[detalhes")) {
-            reasons.add("placeholder do template vazou pra legenda");
+        if (content.productName() == null || content.productName().isBlank()) {
+            reasons.add("productName vazio");
+        }
+        if (content.specs().size() > 4) {
+            reasons.add("specs demais (%d)".formatted(content.specs().size()));
+        }
+        if (content.hook().contains("%s") || content.hook().toLowerCase().contains("[detalhes")) {
+            reasons.add("placeholder do template vazou pro hook");
         }
         return reasons;
     }

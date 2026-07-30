@@ -1,6 +1,0 @@
-Escreva uma legenda curta e empolgante para divulgar esta oferta em um grupo de WhatsApp e canal de Telegram, em português do Brasil, no estilo "Melhore sua autoconfiança com esse livro aqui 📚✨: [detalhes do produto]" - ou seja, comece com um gancho chamativo ligado ao benefício do produto, use 2 a 4 emojis relevantes, e termine mencionando o preço. Não invente características do produto que não estejam listadas abaixo. Responda só com a legenda, sem aspas, sem explicações.
-
-Produto: %s
-Loja: %s
-Preço atual: R$ %s
-Preço anterior: %s

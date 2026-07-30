@@ -41,7 +41,7 @@ public class TelegramBotClient {
         body.put("chat_id", chatId);
         body.put("photo", deal.getImageUrl());
         body.put("caption", caption);
-        body.put("parse_mode", "Markdown");
+        body.put("parse_mode", "MarkdownV2");
 
         restClient.post()
                 .uri("/sendPhoto")
@@ -54,7 +54,7 @@ public class TelegramBotClient {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("chat_id", chatId);
         body.put("text", caption);
-        body.put("parse_mode", "Markdown");
+        body.put("parse_mode", "MarkdownV2");
 
         restClient.post()
                 .uri("/sendMessage")

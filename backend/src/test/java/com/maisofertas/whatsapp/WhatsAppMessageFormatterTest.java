@@ -1,0 +1,87 @@
+package com.maisofertas.whatsapp;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.maisofertas.ai.DealContent;
+import com.maisofertas.deals.Deal;
+import com.maisofertas.deals.DealSource;
+import com.maisofertas.deals.DealStatus;
+import com.maisofertas.deals.Store;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+class WhatsAppMessageFormatterTest {
+
+    private final WhatsAppMessageFormatter formatter = new WhatsAppMessageFormatter();
+
+    private Deal.DealBuilder baseDeal() {
+        return Deal.builder()
+                .id(UUID.randomUUID())
+                .store(Store.AMAZON)
+                .title("Echo Dot 5ª Geração com Alexa")
+                .url("https://amazon.com.br/dp/ABC123?tag=maisoferta0e0-20")
+                .source(DealSource.MANUAL)
+                .status(DealStatus.PENDING)
+                .createdAt(Instant.now());
+    }
+
+    @Test
+    void montaMensagemComTodasAsSecoesSeparadasPorLinhaEmBranco() {
+        Deal deal = baseDeal().price(BigDecimal.valueOf(219.00)).originalPrice(BigDecimal.valueOf(349.00)).build();
+        DealContent content = new DealContent("🔊 Som que enche a casa", "Echo Dot 5ª Geração",
+                List.of("Com Alexa", "Cor Preta"));
+
+        String message = formatter.format(deal, content);
+
+        assertThat(message).isEqualTo(
+                "*🔊 Som que enche a casa*\n\n"
+                        + "📦 *Echo Dot 5ª Geração*\n"
+                        + "• Com Alexa\n"
+                        + "• Cor Preta\n\n"
+                        + "🔥 De ~R$ 349,00~ por *R$ 219,00* (37% OFF)\n\n"
+                        + "🛒 *Ver oferta na Amazon:*\n"
+                        + "https://amazon.com.br/dp/ABC123?tag=maisoferta0e0-20");
+    }
+
+    @Test
+    void naoMostraRiscadoNemDescontoQuandoNaoHaPrecoAnterior() {
+        Deal deal = baseDeal().price(BigDecimal.valueOf(219.00)).build();
+        DealContent content = new DealContent("🔊 Som bom", "Echo Dot", List.of());
+
+        String message = formatter.format(deal, content);
+
+        assertThat(message).contains("🔥 Por *R$ 219,00*");
+        assertThat(message).doesNotContain("~");
+        assertThat(message).doesNotContain("OFF");
+    }
+
+    @Test
+    void naoEscapaPontuacaoPoisWhatsappNaoTemEsquemaDeEscape() {
+        Deal deal = baseDeal().title("Fone (Preto) - Bluetooth 5.0!").price(BigDecimal.TEN).build();
+        DealContent content = new DealContent("🎧 Ótimo p/ academia (1).", "Fone (Preto) - Bluetooth 5.0!",
+                List.of("Bateria 20h."));
+
+        String message = formatter.format(deal, content);
+
+        assertThat(message).contains("🎧 Ótimo p/ academia (1).");
+        assertThat(message).contains("📦 *Fone (Preto) - Bluetooth 5.0!*");
+        assertThat(message).contains("• Bateria 20h.");
+    }
+
+    @Test
+    void removeCaracteresDeMarkupSoltosDoTextoDinamicoParaNaoQuebrarFormatacao() {
+        DealContent content = new DealContent("🔥 Hook com * asterisco solto", "Nome_com_underscore",
+                List.of("spec ~com til~", "spec `com crase`"));
+        Deal deal = baseDeal().price(BigDecimal.TEN).build();
+
+        String message = formatter.format(deal, content);
+
+        assertThat(message).contains("🔥 Hook com  asterisco solto");
+        assertThat(message).contains("Nomecomunderscore");
+        assertThat(message).contains("spec com til");
+        assertThat(message).contains("spec com crase");
+    }
+}

@@ -1,0 +1,12 @@
+Você recebe o título de um produto em oferta (extraído de uma página de e-commerce) e devolve um JSON estruturado para divulgar a oferta num canal de Telegram e grupo de WhatsApp, em português do Brasil. Preço e desconto NÃO entram na sua resposta - isso é calculado à parte.
+
+Responda SOMENTE com um JSON válido no formato abaixo, sem markdown, sem explicações, sem texto antes ou depois:
+{"hook": "...", "productName": "...", "specs": ["...", "..."]}
+
+Regras:
+- "hook": frase curta e empolgante (até 100 caracteres), no estilo "Melhore sua autoconfiança com esse livro aqui 📚✨", começando com 1 emoji relevante ligado ao benefício do produto. NÃO mencione preço aqui.
+- "productName": nome limpo e curto do produto (marca + linha), sem specs técnicas e sem texto promocional.
+- "specs": lista de 1 a 4 detalhes curtos (modelo, geração, capacidade, cor, voltagem, etc.) extraídos SOMENTE do título abaixo. Nunca invente característica que não esteja explicitamente no título. Se não houver nada além do nome, devolva uma lista vazia.
+
+Produto: %s
+Loja: %s

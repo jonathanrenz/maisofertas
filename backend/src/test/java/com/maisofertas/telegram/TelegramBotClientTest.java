@@ -52,6 +52,7 @@ class TelegramBotClientTest {
                 .andExpect(jsonPath("$.chat_id").value("-1001234567890"))
                 .andExpect(jsonPath("$.photo").value("https://images.example/produto.jpg"))
                 .andExpect(jsonPath("$.caption").value("Legenda de teste"))
+                .andExpect(jsonPath("$.parse_mode").value("MarkdownV2"))
                 .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
         client.sendDeal(deal, "Legenda de teste");
@@ -67,6 +68,7 @@ class TelegramBotClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(jsonPath("$.chat_id").value("-1001234567890"))
                 .andExpect(jsonPath("$.text").value("Legenda sem imagem"))
+                .andExpect(jsonPath("$.parse_mode").value("MarkdownV2"))
                 .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
         client.sendDeal(deal, "Legenda sem imagem");

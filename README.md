@@ -11,9 +11,11 @@ maisofertas/
 ```
 
 Pipeline: `POST /deals/manual` (Fase 0) ou sync automático via Canopy API (Fase 1, desligado até a
-key estar configurada) → grava no Postgres com dedup → a cada `PUBLISH_INTERVAL_MS`, gera legenda via
-OpenAI (com fallback determinístico se a IA falhar) → publica no Telegram e no WhatsApp, cada canal
-marcado como postado independentemente.
+key estar configurada) → grava no Postgres com dedup → a cada `PUBLISH_INTERVAL_MS`, gera conteúdo
+estruturado (hook + nome do produto + specs) via OpenAI, com fallback determinístico se a IA falhar →
+cada canal formata a própria mensagem (preço, desconto e link são sempre calculados de forma
+determinística, nunca pela IA) → publica no Telegram (MarkdownV2, com texto riscado de verdade no preço
+"de") e no WhatsApp (marcação nativa), cada canal marcado como postado independentemente.
 
 **Por que Fase 0 é manual (e por que Canopy, não a API oficial da Amazon):** a PA-API da Amazon foi
 desativada em 15/mai/2026. O substituto (Creators API) só libera acesso com 10 vendas qualificadas nos
@@ -28,11 +30,11 @@ que o Fase 1 preenche sozinho, então nada no resto do pipeline muda quando a sy
 
 | Pacote | Responsabilidade |
 |---|---|
-| `deals` | Entidade `Deal`, repositório, dedup (mesma URL não posta 2x em N dias), `POST /deals/manual` (`AmazonController`) |
-| `ai` | `CaptionGenerator` → `OpenAiCaptionGenerator` (modelo econômico, configurável) com fallback determinístico automático em `FallbackCaptionGenerator` |
-| `telegram` | `TelegramBotClient` — Bot API via REST direto |
-| `whatsapp` | `EvolutionApiClient` — instância self-hosted do Evolution API |
-| `publish` | `PublishOrchestrator` — `@Scheduled`, publica pendentes, idempotente por canal |
+| `deals` | Entidade `Deal`, repositório, dedup (mesma URL não posta 2x em N dias), `PriceFormatter` (preço/desconto em `R$ 1.499,00`, padrão brasileiro), `POST /deals/manual` (`AmazonController`) |
+| `ai` | `DealContentGenerator` → `OpenAiDealContentGenerator` (modelo econômico, configurável, `response_format=json_object`, devolve hook + nome do produto + specs extraídas do título) com fallback determinístico automático em `FallbackDealContentGenerator` |
+| `telegram` | `TelegramBotClient` — Bot API via REST direto (`parse_mode=MarkdownV2`) — e `TelegramMessageFormatter`, que monta a mensagem e escapa os caracteres reservados do MarkdownV2 |
+| `whatsapp` | `EvolutionApiClient` — instância self-hosted do Evolution API — e `WhatsAppMessageFormatter`, que monta a mensagem com a marcação nativa do WhatsApp (`*negrito*`, `~riscado~`) |
+| `publish` | `PublishOrchestrator` — `@Scheduled`, gera o conteúdo uma vez e publica pendentes, idempotente por canal, cada canal com sua própria formatação |
 | `amazon` | `AmazonController` — `POST /deals/manual` (Fase 0) |
 | `canopy` | `CanopyClient` (REST, `GET /api/amazon/deals`) e `CanopySyncScheduler` (Fase 1, `@Scheduled`, desligado por padrão) |
 
@@ -43,7 +45,7 @@ Pré-requisito: Java 21+ (o projeto foi gerado/testado com JDK 26 instalado em
 
 ```bash
 cd backend
-./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 29 testes
+./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 46 testes
 ./mvnw spring-boot:run          # sobe a app (precisa de Postgres - veja infra/)
 ```
 
@@ -65,20 +67,21 @@ docker compose --profile whatsapp up -d --build
 - App: `http://localhost:8081`
 - Evolution API (manager/QR code, só com o profile `whatsapp` ativo): `http://localhost:8080`
 
-### Rodando o eval de qualidade da legenda (chamada real e paga à OpenAI)
+### Rodando o eval de qualidade do conteúdo gerado (chamada real e paga à OpenAI)
 
 Não roda no `mvn test` normal. Exige `OPENAI_API_KEY` no ambiente:
 
 ```bash
-OPENAI_API_KEY=sk-... ./mvnw test -DexcludedGroups= -Dgroups=eval -Dtest=OpenAiCaptionGeneratorEvalTest
+OPENAI_API_KEY=sk-... ./mvnw test -DexcludedGroups= -Dgroups=eval -Dtest=OpenAiDealContentGeneratorEvalTest
 ```
 
-Roda 12 produtos fixos contra uma rubrica (tem emoji, menciona preço, tamanho ok, sem placeholder
-vazando) e exige >=90% de aprovação. Sem a chave, o teste é pulado (não falha o build).
+Roda 12 produtos fixos contra uma rubrica (hook não vazio com emoji e sem preço, nome do produto não
+vazio, no máximo 4 specs, sem placeholder vazando) e exige >=90% de aprovação. Sem a chave, o teste é
+pulado (não falha o build).
 
 > A suíte completa `mvn test` (sem filtro) também inclui `MaisofertasBackendApplicationTests`, que sobe
-> um Postgres real via Testcontainers — precisa do Docker Desktop rodando. Os 29 gate tests dos pacotes
-> acima **não** precisam de Docker.
+> um Postgres real via Testcontainers — precisa do Docker Desktop rodando. Os outros 45 gate tests dos
+> pacotes acima **não** precisam de Docker.
 
 ## Testando o fluxo manual ponta a ponta
 
