@@ -69,11 +69,12 @@ class OpenAiCaptionGeneratorEvalTest {
         int passed = 0;
 
         for (Fixture fixture : FIXTURES) {
+            String url = "https://amazon.com.br/dp/TESTE?tag=maisoferta0e0-20";
             Deal deal = Deal.builder()
                     .id(UUID.randomUUID())
                     .store(Store.AMAZON)
                     .title(fixture.title())
-                    .url("https://amazon.com.br/dp/TESTE")
+                    .url(url)
                     .price(fixture.price())
                     .originalPrice(fixture.originalPrice())
                     .source(DealSource.MANUAL)
@@ -82,7 +83,7 @@ class OpenAiCaptionGeneratorEvalTest {
                     .build();
 
             String caption = generator.generateCaption(deal);
-            List<String> reasons = rubricFailures(caption, fixture);
+            List<String> reasons = rubricFailures(caption, fixture, url);
 
             if (reasons.isEmpty()) {
                 passed++;
@@ -98,12 +99,15 @@ class OpenAiCaptionGeneratorEvalTest {
         assertThat(passRate).as(report).isGreaterThanOrEqualTo(PASS_THRESHOLD);
     }
 
-    private List<String> rubricFailures(String caption, Fixture fixture) {
+    private List<String> rubricFailures(String caption, Fixture fixture, String url) {
         List<String> reasons = new ArrayList<>();
 
         if (caption == null || caption.isBlank()) {
             reasons.add("legenda vazia");
             return reasons;
+        }
+        if (!caption.contains(url)) {
+            reasons.add("não contém o link de afiliado (" + url + ")");
         }
         if (!EMOJI_PATTERN.matcher(caption).find()) {
             reasons.add("sem emoji");

@@ -74,7 +74,7 @@ public class OpenAiCaptionGenerator implements CaptionGenerator {
             if (content == null || content.isBlank()) {
                 throw new IllegalStateException("Resposta vazia da OpenAI");
             }
-            return content.trim();
+            return content.trim() + "\n\n👉 " + deal.getUrl();
         } catch (Exception e) {
             log.warn("Falha ao gerar legenda via OpenAI para deal {}, usando fallback determinístico",
                     deal.getId(), e);

@@ -63,8 +63,22 @@ class OpenAiCaptionGeneratorTest {
 
         String caption = generator.generateCaption(sampleDeal());
 
-        assertThat(caption).isEqualTo("Melhore sua autoconfiança com esse livro aqui 📚✨: por R$ 39.90!");
+        assertThat(caption).isEqualTo(
+                "Melhore sua autoconfiança com esse livro aqui 📚✨: por R$ 39.90!\n\n👉 https://amazon.com.br/dp/ABC123");
         server.verify();
+    }
+
+    @Test
+    void sempreAnexaUrlDoDealNaLegendaDaOpenaiMesmoQuandoModeloNaoMenciona() {
+        server.expect(requestTo("https://api.openai.local/v1/chat/completions"))
+                .andRespond(withSuccess(
+                        "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":"
+                                + "\"Legenda sem link nenhum aqui \\ud83d\\udd25\"}}]}",
+                        MediaType.APPLICATION_JSON));
+
+        String caption = generator.generateCaption(sampleDeal());
+
+        assertThat(caption).endsWith("👉 https://amazon.com.br/dp/ABC123");
     }
 
     @Test
