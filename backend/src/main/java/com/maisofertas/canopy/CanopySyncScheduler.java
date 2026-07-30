@@ -19,11 +19,11 @@ import org.springframework.stereotype.Component;
  * padrão ({@code app.canopy.sync.enabled=false}) até a API key estar
  * configurada.
  *
- * <p>Orçamento do plano free da Canopy (100 requests/mês): com
- * {@code pages-per-run=1} e o intervalo padrão de 8h (3 rodadas/dia), o
- * consumo fica em ~90 requests/mês (3 * 30), deixando folga pra lookups
- * manuais. Não reduza o intervalo nem aumente pages-per-run sem recalcular
- * essa conta.
+ * <p>Plano pay-as-you-go da Canopy: 100 requests/mês grátis, $0.01 por
+ * request extra. Com {@code pages-per-run=1} e intervalo de 1h (24
+ * rodadas/dia), o consumo é ~720 requests/mês (~US$6,20/mês em requests
+ * extras). Cada aumento de frequência ou de pages-per-run multiplica o
+ * consumo mensal linearmente — recalcule antes de mudar.
  */
 @Component
 @ConditionalOnProperty(name = "app.canopy.sync.enabled", havingValue = "true")
