@@ -55,6 +55,7 @@ class OpenAiCaptionGeneratorTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer test-key"))
                 .andExpect(jsonPath("$.model").value("gpt-5-nano"))
+                .andExpect(jsonPath("$.reasoning_effort").value("minimal"))
                 .andExpect(jsonPath("$.messages[1].content").exists())
                 .andRespond(withSuccess(
                         "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":"

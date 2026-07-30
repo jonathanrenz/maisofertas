@@ -1,5 +1,6 @@
 package com.maisofertas.ai;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.maisofertas.deals.Deal;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,7 +56,11 @@ public class OpenAiCaptionGenerator implements CaptionGenerator {
                     deal.getPrice(),
                     deal.getOriginalPrice() != null ? "R$ " + deal.getOriginalPrice() : "sem preço anterior informado");
 
-            ChatRequest request = new ChatRequest(model, List.of(
+            // reasoning_effort=minimal: sem isso o gpt-5-nano gasta ~2500 reasoning
+            // tokens invisíveis (cobrados como output) numa tarefa de texto curto e
+            // simples como essa; com "minimal" cai pra ~50-70 tokens, mesma qualidade
+            // visível, ~38x mais barato.
+            ChatRequest request = new ChatRequest(model, "minimal", List.of(
                     new ChatMessage("system",
                             "Você escreve legendas curtas e empolgantes de ofertas para grupos de WhatsApp "
                                     + "e canais de Telegram, em português do Brasil, sempre com emojis relevantes."),
@@ -93,7 +98,8 @@ public class OpenAiCaptionGenerator implements CaptionGenerator {
     record ChatMessage(String role, String content) {
     }
 
-    record ChatRequest(String model, List<ChatMessage> messages) {
+    record ChatRequest(String model, @JsonProperty("reasoning_effort") String reasoningEffort,
+            List<ChatMessage> messages) {
     }
 
     record ChatResponse(List<Choice> choices) {
