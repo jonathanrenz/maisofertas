@@ -115,8 +115,56 @@ Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram, E
    Evolution API, entrar no grupo de ofertas → pegar o JID do grupo para `EVOLUTION_GROUP_JID`. Sem
    isso configurado, o `PublishOrchestrator` só publica no Telegram (WhatsApp fica com erro esperado
    nos logs, sem travar o resto do pipeline).
-4. VPS com Docker pra rodar 24/7 (hoje só documentado rodando local).
+4. VPS com Docker pra rodar 24/7 — feito, ver [Deploy na VPS](#deploy-na-vps) abaixo.
 5. Chave da OpenAI → `OPENAI_API_KEY`. Sem ela, o app funciona normalmente com o fallback determinístico.
+
+## Deploy na VPS
+
+Stack roda em `deploy@<ip-da-vps>:~/maisofertas` via Docker Compose, perfil `whatsapp` sempre ligado
+(Telegram + WhatsApp). O usuário `deploy` está no grupo `docker` e tem sudo sem senha; o Docker do
+host já inicia no boot (`systemctl enable docker`), e cada container sobe com `restart: unless-stopped`
+— não precisa de systemd unit própria.
+
+O repo é privado, então o clone na VPS usa uma **deploy key read-only** dedicada
+(`~/.ssh/maisofertas_deploy_key`, alias `github-maisofertas` no `~/.ssh/config` do usuário `deploy`),
+cadastrada nas Deploy Keys do repo no GitHub. Ela só permite `git pull`, nunca push.
+
+Portas: só 22/80/443 estão liberadas no firewall (`ufw`) da VPS — a mesma VPS já hospeda outra
+aplicação (nginx + certbot ocupando 80/443). As portas do compose (8081 app, 8082 Evolution API
+manager) ficam só em loopback/rede interna do Docker; não são expostas à internet. Pra acessar o
+manager do Evolution API (ex: reconectar o WhatsApp depois de um logout), abra um túnel SSH:
+
+```bash
+ssh -N -L 8082:localhost:8082 deploy@<ip-da-vps>
+# depois abra http://localhost:8082/manager no navegador local
+```
+
+### Deploy inicial (já feito)
+
+```bash
+ssh deploy@<ip-da-vps>
+git clone git@github-maisofertas:jonathanrenz/maisofertas.git ~/maisofertas
+# copiar infra/.env local (com os secrets reais) pro mesmo caminho na VPS via scp, chmod 600
+cd ~/maisofertas/infra
+docker compose --profile whatsapp up -d --build
+```
+
+Depois, criar a instância do WhatsApp pelo manager (túnel acima): "New instance" com nome
+`maisofertas` (mesmo valor de `EVOLUTION_INSTANCE`), canal Baileys, sem número fixo → "Get QR Code" →
+escanear com o WhatsApp que já está no grupo de ofertas alvo (`EVOLUTION_GROUP_JID`).
+
+### Atualizar (deploys seguintes)
+
+```bash
+ssh deploy@<ip-da-vps>
+cd ~/maisofertas
+git pull
+cd infra
+docker compose --profile whatsapp up -d --build
+```
+
+Não precisa recriar a instância do WhatsApp nem o `.env` — só o container da app é rebuildado; Postgres,
+Redis e a sessão do Evolution API continuam com os volumes/dados existentes.
 
 ## Fase 1 (sync automático via Canopy API)
 
