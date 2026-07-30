@@ -13,8 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Fase 0: entrada manual de ofertas, no mesmo formato que a Fase 1 (Creators
- * API / Keepa) vai preencher automaticamente via {@link AmazonSyncScheduler}.
+ * Fase 0: entrada manual de ofertas, no mesmo formato que a Fase 1 (Canopy
+ * API) preenche automaticamente via
+ * {@link com.maisofertas.canopy.CanopySyncScheduler}.
  */
 @RestController
 @RequestMapping("/deals")

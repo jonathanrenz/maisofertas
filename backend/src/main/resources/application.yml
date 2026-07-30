@@ -32,5 +32,12 @@ app:
     group-jid: ${EVOLUTION_GROUP_JID:}
   amazon:
     associate-tag: ${AMAZON_ASSOCIATE_TAG:}
+  canopy:
+    base-url: ${CANOPY_BASE_URL:https://rest.canopyapi.co}
+    api-key: ${CANOPY_API_KEY:}
+    domain: ${CANOPY_DOMAIN:BR}
+    min-discount-percent: ${CANOPY_MIN_DISCOUNT_PERCENT:20}
     sync:
-      enabled: ${AMAZON_SYNC_ENABLED:false}
+      enabled: ${CANOPY_SYNC_ENABLED:false}
+      interval-ms: ${CANOPY_SYNC_INTERVAL_MS:28800000}
+      pages-per-run: ${CANOPY_SYNC_PAGES_PER_RUN:1}

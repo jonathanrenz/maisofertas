@@ -10,15 +10,19 @@ maisofertas/
   infra/       # docker-compose (app + postgres + redis + evolution-api)
 ```
 
-Pipeline: `POST /deals/manual` (Fase 0) ou sync automático da Amazon (Fase 1, ainda desligado)
-→ grava no Postgres com dedup → a cada `PUBLISH_INTERVAL_MS`, gera legenda via OpenAI (com fallback
-determinístico se a IA falhar) → publica no Telegram e no WhatsApp, cada canal marcado como postado
-independentemente.
+Pipeline: `POST /deals/manual` (Fase 0) ou sync automático via Canopy API (Fase 1, desligado até a
+key estar configurada) → grava no Postgres com dedup → a cada `PUBLISH_INTERVAL_MS`, gera legenda via
+OpenAI (com fallback determinístico se a IA falhar) → publica no Telegram e no WhatsApp, cada canal
+marcado como postado independentemente.
 
-**Por que Fase 0 é manual:** a PA-API da Amazon foi desativada em 15/mai/2026. O substituto (Creators
-API) só libera acesso com 10 vendas qualificadas nos últimos 30 dias. Até bater esse número (ou decidir
-pagar a Keepa antes disso), as ofertas entram via `POST /deals/manual` — mesmo formato que a Fase 1 vai
-preencher sozinha, então nada no resto do pipeline muda quando a API for ligada.
+**Por que Fase 0 é manual (e por que Canopy, não a API oficial da Amazon):** a PA-API da Amazon foi
+desativada em 15/mai/2026. O substituto (Creators API) só libera acesso com 10 vendas qualificadas nos
+últimos 30 dias — a conta ainda não bateu esse número. Em vez de esperar, o Fase 1 usa a
+[Canopy API](https://www.canopyapi.co) (`GET /api/amazon/deals`, REST) como fonte de dados: ela não
+exige esse gate, só uma API key. O app só monta o link de afiliado (`AMAZON_ASSOCIATE_TAG`) em cima da
+URL que a Canopy devolve — nenhuma lógica de afiliado depende da Canopy. Até configurar
+`CANOPY_API_KEY`/`CANOPY_SYNC_ENABLED=true`, as ofertas entram via `POST /deals/manual` — mesmo formato
+que o Fase 1 preenche sozinho, então nada no resto do pipeline muda quando a sync for ligada.
 
 ## Pacotes (`backend/src/main/java/com/maisofertas/`)
 
@@ -29,7 +33,8 @@ preencher sozinha, então nada no resto do pipeline muda quando a API for ligada
 | `telegram` | `TelegramBotClient` — Bot API via REST direto |
 | `whatsapp` | `EvolutionApiClient` — instância self-hosted do Evolution API |
 | `publish` | `PublishOrchestrator` — `@Scheduled`, publica pendentes, idempotente por canal |
-| `amazon` | `AmazonController` (entrada manual) e `AmazonSyncScheduler` (Fase 1, desligado) |
+| `amazon` | `AmazonController` — `POST /deals/manual` (Fase 0) |
+| `canopy` | `CanopyClient` (REST, `GET /api/amazon/deals`) e `CanopySyncScheduler` (Fase 1, `@Scheduled`, desligado por padrão) |
 
 ## Rodando localmente
 
@@ -38,7 +43,7 @@ Pré-requisito: Java 21+ (o projeto foi gerado/testado com JDK 26 instalado em
 
 ```bash
 cd backend
-./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 18 testes
+./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 29 testes
 ./mvnw spring-boot:run          # sobe a app (precisa de Postgres - veja infra/)
 ```
 
@@ -72,7 +77,7 @@ Roda 12 produtos fixos contra uma rubrica (tem emoji, menciona preço, tamanho o
 vazando) e exige >=90% de aprovação. Sem a chave, o teste é pulado (não falha o build).
 
 > A suíte completa `mvn test` (sem filtro) também inclui `MaisofertasBackendApplicationTests`, que sobe
-> um Postgres real via Testcontainers — precisa do Docker Desktop rodando. Os 18 gate tests dos pacotes
+> um Postgres real via Testcontainers — precisa do Docker Desktop rodando. Os 29 gate tests dos pacotes
 > acima **não** precisam de Docker.
 
 ## Testando o fluxo manual ponta a ponta
@@ -96,7 +101,7 @@ dias) retorna `409 Conflict`.
 
 ## Variáveis de ambiente
 
-Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram e Evolution API.
+Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram, Evolution API e Canopy.
 
 ## Antes de ir pra produção (checklist da Fase 0)
 
@@ -113,8 +118,20 @@ Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram e 
 4. VPS com Docker pra rodar 24/7 (hoje só documentado rodando local).
 5. Chave da OpenAI → `OPENAI_API_KEY`. Sem ela, o app funciona normalmente com o fallback determinístico.
 
-## Fase 1 (quando destravar API da Amazon)
+## Fase 1 (sync automático via Canopy API)
 
-Implementar a lógica real dentro de `AmazonSyncScheduler` (Creators API ou Keepa) chamando
-`DealService.createDeal(request, DealSource.CREATORS_API)` (ou `KEEPA`), e ligar com
-`AMAZON_SYNC_ENABLED=true`. Nada em `deals`, `ai`, `telegram`, `whatsapp` ou `publish` precisa mudar.
+1. Crie a conta em [canopyapi.co](https://www.canopyapi.co), escolha a interface **REST** no cadastro
+   (não GraphQL nem MCP — o backend é um job agendado determinístico, não um agente de IA) e pegue a
+   API key no painel. O plano free dá **100 requests/mês**.
+2. Preencha `CANOPY_API_KEY` no `.env` e ligue com `CANOPY_SYNC_ENABLED=true`.
+3. Confira o orçamento antes de mudar `CANOPY_SYNC_INTERVAL_MS` ou `CANOPY_SYNC_PAGES_PER_RUN`: o
+   default (8h de intervalo × 1 página/rodada × 3 rodadas/dia × 30 dias) consome ~90 requests/mês,
+   dentro do free tier. Aumentar qualquer um dos dois sem recalcular estoura a cota.
+4. `CANOPY_MIN_DISCOUNT_PERCENT` (padrão 20) filtra quais ofertas viram `Deal` — abaixo disso a Canopy
+   ainda retorna o produto, mas o `CanopySyncScheduler` ignora.
+5. `CANOPY_DOMAIN` (padrão `BR`) escolhe o marketplace (`amazon.com.br`). Outros valores suportados:
+   `US`, `UK`, `CA`, `DE`, `FR`, `IT`, `ES`, `AU`, `IN`, `MX`, `JP`, `PL`.
+
+Nada em `deals`, `ai`, `telegram`, `whatsapp` ou `publish` precisa mudar — o `CanopySyncScheduler` só
+chama `DealService.createDeal(request, DealSource.CANOPY)`, mesmo contrato que o `POST /deals/manual`
+já usa.
