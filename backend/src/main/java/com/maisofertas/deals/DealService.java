@@ -30,15 +30,16 @@ public class DealService {
     }
 
     public Deal createDeal(CreateDealRequest request, DealSource source) {
-        if (isDuplicate(request.url())) {
-            throw new DuplicateDealException(request.url());
-        }
         Store store = request.store() != null ? request.store() : Store.AMAZON;
+        String url = applyAffiliateTag(request.url(), store);
+        if (isDuplicate(url)) {
+            throw new DuplicateDealException(url);
+        }
         Deal deal = Deal.builder()
                 .id(UUID.randomUUID())
                 .store(store)
                 .title(request.title())
-                .url(applyAffiliateTag(request.url(), store))
+                .url(url)
                 .imageUrl(request.imageUrl())
                 .price(request.price())
                 .originalPrice(request.originalPrice())

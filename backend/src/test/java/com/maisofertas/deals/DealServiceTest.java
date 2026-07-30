@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -136,6 +137,24 @@ class DealServiceTest {
         Deal saved = withTag.createDeal(request, DealSource.MANUAL);
 
         assertThat(saved.getUrl()).isEqualTo("https://amazon.com.br/dp/ABC123?tag=outra-tag-20");
+    }
+
+    @Test
+    void verificaDuplicataUsandoUrlComTagJaAplicada() {
+        // Regressão: o dedup checava a URL crua (sem "tag=") mas salvava a URL com
+        // a tag de afiliado aplicada. Como o repositório sempre guarda a URL com
+        // tag, o check nunca batia e o mesmo deal era recriado a cada sync.
+        DealService withTag = new DealService(repository, 7, "maisoferta0e0-20");
+        String rawUrl = "https://amazon.com.br/dp/ABC123";
+        String taggedUrl = "https://amazon.com.br/dp/ABC123?tag=maisoferta0e0-20";
+        when(repository.existsByUrlAndCreatedAtAfter(eq(taggedUrl), any(Instant.class))).thenReturn(true);
+
+        CreateDealRequest request = new CreateDealRequest("Produto", rawUrl, null, BigDecimal.TEN, null,
+                Store.AMAZON);
+
+        assertThatThrownBy(() -> withTag.createDeal(request, DealSource.CANOPY))
+                .isInstanceOf(DuplicateDealException.class);
+        verify(repository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
