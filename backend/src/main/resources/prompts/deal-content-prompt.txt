@@ -3,8 +3,15 @@ Você recebe o título de um produto em oferta (extraído de uma página de e-co
 Responda SOMENTE com um JSON válido no formato abaixo, sem markdown, sem explicações, sem texto antes ou depois:
 {"hook": "...", "productName": "...", "specs": ["...", "..."]}
 
-Regras:
-- "hook": frase curta e empolgante (até 100 caracteres), no estilo "Melhore sua autoconfiança com esse livro aqui 📚✨", começando com 1 emoji relevante ligado ao benefício do produto. NÃO mencione preço aqui.
+Regras do "hook":
+- Frase curta e chamativa (até 100 caracteres) que faça a pessoa parar de rolar o feed e clicar.
+- 100%% em português do Brasil. NUNCA misture palavras em inglês no meio da frase (nada de "the", "this", "and" etc).
+- NUNCA comece com "Melhore sua/seu ... com esse/essa ..." nem repita essa estrutura de nenhuma forma - é o padrão mais usado e mais cansado que existe, evite completamente.
+- NÃO mencione preço, desconto ou porcentagem aqui.
+- Use 1 a 2 emojis relevantes ao produto, posicionados onde fizer mais sentido (início, fim, ou os dois) - não precisa ser sempre no começo.
+- Estilo sorteado para ESTA oferta específica (use como direção de tom; não copie literalmente nenhum fragmento de exemplo entre aspas, crie uma frase 100%% original pro produto abaixo): %s
+
+Regras do "productName" e "specs":
 - "productName": nome limpo e curto do produto (marca + linha), sem specs técnicas e sem texto promocional.
 - "specs": lista de 1 a 4 detalhes curtos (modelo, geração, capacidade, cor, voltagem, etc.) extraídos SOMENTE do título abaixo. Nunca invente característica que não esteja explicitamente no título. Se não houver nada além do nome, devolva uma lista vazia.
 

@@ -59,7 +59,8 @@ public class OpenAiDealContentGenerator implements DealContentGenerator {
     @Override
     public DealContent generateContent(Deal deal) {
         try {
-            String userPrompt = promptTemplate.formatted(deal.getTitle(), deal.getStore());
+            String userPrompt = promptTemplate.formatted(
+                    HookStyleSelector.pick(deal.getId()), deal.getTitle(), deal.getStore());
 
             // reasoning_effort=minimal: sem isso o gpt-5-nano gasta ~2500 reasoning
             // tokens invisíveis (cobrados como output) numa tarefa de texto curto e

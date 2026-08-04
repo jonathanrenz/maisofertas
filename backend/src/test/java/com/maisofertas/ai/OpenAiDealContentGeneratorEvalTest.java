@@ -10,8 +10,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -27,15 +30,26 @@ import tools.jackson.databind.ObjectMapper;
  *
  * Rubrica por item: hook não vazio com emoji e sem preço, productName não
  * vazio, specs (quando existem) só reaproveitam palavras do título — ou seja,
- * não inventa característica. Threshold de aprovação: 90% dos itens passando
- * em todos os critérios.
+ * não inventa característica, hook não usa o padrão genérico "Melhore sua/seu
+ * X com esse/essa Y" e não mistura palavra em inglês. Threshold de aprovação:
+ * 90% dos itens passando em todos os critérios, MAIS uma checagem agregada de
+ * diversidade: nenhuma primeira palavra pode se repetir em mais de ~1/3 dos
+ * hooks do lote (é essa checagem agregada que pega a regressão real que
+ * motivou essas regras — hooks individualmente "válidos" mas todos
+ * estruturalmente idênticos, tipo "Melhore sua circulação de ar com esse
+ * ventilador" / "Melhore sua casa com esse aspirador").
  */
 @Tag("eval")
 @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
 class OpenAiDealContentGeneratorEvalTest {
 
     private static final double PASS_THRESHOLD = 0.90;
+    private static final double MAX_SHARED_OPENING_RATIO = 0.34;
     private static final Pattern EMOJI_PATTERN = Pattern.compile("[\\p{So}\\p{Cn}\\x{1F300}-\\x{1FAFF}]");
+    private static final Pattern GENERIC_TEMPLATE_PATTERN =
+            Pattern.compile("(?i).*melhor[ae] (sua|seu) .*com (esse|essa) .*");
+    private static final Pattern ENGLISH_LEAK_PATTERN =
+            Pattern.compile("(?i)\\b(the|this|that|and|with|your|for)\\b");
 
     private record Fixture(String title, BigDecimal price, BigDecimal originalPrice) {
     }
@@ -69,6 +83,7 @@ class OpenAiDealContentGeneratorEvalTest {
                 new FallbackDealContentGenerator(), new ObjectMapper());
 
         List<String> failures = new ArrayList<>();
+        List<String> allHooks = new ArrayList<>();
         int passed = 0;
 
         for (Fixture fixture : FIXTURES) {
@@ -85,6 +100,7 @@ class OpenAiDealContentGeneratorEvalTest {
                     .build();
 
             DealContent content = generator.generateContent(deal);
+            allHooks.add(content.hook());
             List<String> reasons = rubricFailures(content, fixture);
 
             if (reasons.isEmpty()) {
@@ -101,6 +117,33 @@ class OpenAiDealContentGeneratorEvalTest {
                 .formatted(passRate * 100, passed, FIXTURES.size(), String.join("\n", failures));
 
         assertThat(passRate).as(report).isGreaterThanOrEqualTo(PASS_THRESHOLD);
+
+        assertDiversity(allHooks);
+    }
+
+    /**
+     * Pega o caso de hooks individualmente "válidos" na rubrica mas todos
+     * estruturalmente iguais (a regressão real que motivou essas regras: cada
+     * hook sozinho parecia ok, o problema só aparecia comparando o lote
+     * inteiro).
+     */
+    private void assertDiversity(List<String> hooks) {
+        Map<String, Long> openingWordCounts = hooks.stream()
+                .map(this::firstWord)
+                .collect(Collectors.groupingBy(w -> w, Collectors.counting()));
+        long maxAllowed = Math.max(1, Math.round(hooks.size() * MAX_SHARED_OPENING_RATIO));
+        long maxObserved = openingWordCounts.values().stream().mapToLong(Long::longValue).max().orElse(0);
+
+        String report = "Primeira palavra de cada hook: %s | contagem por palavra: %s | hooks completos: %s"
+                .formatted(hooks.stream().map(this::firstWord).toList(), openingWordCounts, hooks);
+
+        assertThat(maxObserved).as(report).isLessThanOrEqualTo(maxAllowed);
+    }
+
+    private String firstWord(String hook) {
+        String semEmojiNoInicio = hook.replaceAll("^[^\\p{L}]+", "");
+        String[] palavras = semEmojiNoInicio.split("\\s+", 2);
+        return palavras.length > 0 ? palavras[0].toLowerCase(Locale.forLanguageTag("pt-BR")) : "";
     }
 
     private List<String> rubricFailures(DealContent content, Fixture fixture) {
@@ -128,6 +171,12 @@ class OpenAiDealContentGeneratorEvalTest {
         }
         if (content.hook().contains("%s") || content.hook().toLowerCase().contains("[detalhes")) {
             reasons.add("placeholder do template vazou pro hook");
+        }
+        if (GENERIC_TEMPLATE_PATTERN.matcher(content.hook()).matches()) {
+            reasons.add("hook usa o padrão genérico 'Melhore sua/seu X com esse/essa Y'");
+        }
+        if (ENGLISH_LEAK_PATTERN.matcher(content.hook()).find()) {
+            reasons.add("hook mistura palavra em inglês: " + content.hook());
         }
         return reasons;
     }

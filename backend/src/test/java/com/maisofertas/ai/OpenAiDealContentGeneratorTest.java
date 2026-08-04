@@ -1,6 +1,7 @@
 package com.maisofertas.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -123,6 +124,24 @@ class OpenAiDealContentGeneratorTest {
 
         assertThat(content.hook()).isEqualTo("🔥 Oferta imperdível!");
         assertThat(content.productName()).isEqualTo(sampleDeal().getTitle());
+    }
+
+    @Test
+    void incluiOEstiloSorteadoParaOIdDoDealNoPromptEnviadoParaOpenai() {
+        Deal deal = sampleDeal();
+        String estiloEsperado = HookStyleSelector.pick(deal.getId());
+
+        server.expect(requestTo("https://api.openai.local/v1/chat/completions"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.messages[1].content", containsString(estiloEsperado)))
+                .andRespond(withSuccess(
+                        "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":"
+                                + jsonEscaped("{\"hook\":\"🔥 Teste\",\"productName\":\"X\",\"specs\":[]}") + "}}]}",
+                        MediaType.APPLICATION_JSON));
+
+        generator.generateContent(deal);
+
+        server.verify();
     }
 
     @Test
