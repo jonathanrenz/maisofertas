@@ -58,6 +58,17 @@ class ShopeeSyncSchedulerTest {
     }
 
     @Test
+    void ignoraOfertaSemLinkDeAfiliadoParaNaoPublicarDealSemComissao() {
+        ShopeeSyncScheduler scheduler = new ShopeeSyncScheduler(shopeeClient, dealService, 1, 20, 0);
+        when(shopeeClient.fetchDeals(1, 20)).thenReturn(List.of(
+                new ShopeeDeal(1L, "Produto sem offerLink", null, null, BigDecimal.TEN, null, 10)));
+
+        scheduler.syncDeals();
+
+        verify(dealService, never()).createDeal(any(), any());
+    }
+
+    @Test
     void naoPropagaExcecaoQuandoDealJaExisteEContinuaOsProximos() {
         ShopeeSyncScheduler scheduler = new ShopeeSyncScheduler(shopeeClient, dealService, 1, 20, 0);
         when(shopeeClient.fetchDeals(1, 20)).thenReturn(List.of(

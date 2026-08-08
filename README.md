@@ -227,7 +227,17 @@ Pra ligar de verdade:
    — nenhum ordena por desconto direto, então o filtro de qualidade real é o `SHOPEE_MIN_DISCOUNT_PERCENT`
    aplicado depois.
 
-Testar manualmente um deal Shopee sem esperar o sync (mesmo endpoint da Fase 0, só troca o `store`):
+**Como a comissão funciona:** diferente da Amazon (link normal + `tag=` colado por cima), a Shopee
+Affiliate API já devolve o link com o tracking de afiliado embutido no campo `offerLink` (link curto
+`s.shopee.com.br/...`, atrelado ao seu `SHOPEE_APP_ID`) - o `productLink` que vem junto é só a página
+normal do produto, sem comissão nenhuma. O `ShopeeClient` usa **só** `offerLink`; se algum produto vier
+sem ele, o `ShopeeSyncScheduler` descarta o item (conta como "ignorado" no log) em vez de publicar uma
+oferta que não renderia comissão.
+
+Testar manualmente um deal Shopee sem esperar o sync (mesmo endpoint da Fase 0, só troca o `store`) -
+**use sempre o `offerLink`** (link curto `s.shopee.com.br/...`), nunca a URL normal do produto: gere um
+pelo app Shopee Afiliados (ícone de compartilhar em qualquer produto → "Copiar link" com a conta de
+afiliado logada) ou via `productOfferV2(itemId: X)` na mesma API:
 
 ```bash
 curl -X POST http://localhost:8081/deals/manual \

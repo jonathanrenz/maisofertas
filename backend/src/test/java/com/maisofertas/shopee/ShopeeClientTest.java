@@ -87,7 +87,9 @@ class ShopeeClientTest {
         assertThat(first.percentOff()).isEqualTo(35);
 
         ShopeeDeal second = deals.get(1);
-        assertThat(second.url()).isEqualTo("https://shopee.com.br/product/1/987654321");
+        assertThat(second.url())
+                .as("sem offerLink, a url deve ficar nula (não cair pro productLink sem comissão)")
+                .isNull();
         assertThat(second.originalPrice()).isNull();
         assertThat(second.percentOff()).isZero();
     }

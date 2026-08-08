@@ -126,7 +126,10 @@ public class ShopeeClient {
         BigDecimal price = parseDecimal(raw.priceMin());
         Integer percentOff = parseInt(raw.priceDiscountRate());
         BigDecimal originalPrice = computeOriginalPrice(price, percentOff);
-        String url = raw.offerLink() != null && !raw.offerLink().isBlank() ? raw.offerLink() : raw.productLink();
+        // offerLink é o link com o tracking de afiliado (é isso que gera comissão); productLink é
+        // só a página normal do produto. Sem offerLink, url fica nula de propósito - isEligible()
+        // no ShopeeSyncScheduler descarta o item em vez de publicar um deal que não rende comissão.
+        String url = raw.offerLink() != null && !raw.offerLink().isBlank() ? raw.offerLink() : null;
         return new ShopeeDeal(
                 raw.itemId(),
                 raw.productName(),
