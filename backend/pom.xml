@@ -28,9 +28,10 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
-		<!-- Lane de eval (chamadas reais e pagas de IA) fica de fora do "mvn test" comum.
-		     Rodar explicitamente com: mvn test -DexcludedGroups= -Dgroups=eval -->
-		<excludedGroups>eval</excludedGroups>
+		<!-- Lane de eval (chamadas reais e pagas de IA) e lane "live" (chamadas reais a APIs
+		     externas pra validar contrato, ex: Shopee) ficam de fora do "mvn test" comum.
+		     Rodar explicitamente com: mvn test -DexcludedGroups= -Dgroups=eval (ou -Dgroups=live) -->
+		<excludedGroups>eval,live</excludedGroups>
 	</properties>
 	<dependencies>
 		<dependency>

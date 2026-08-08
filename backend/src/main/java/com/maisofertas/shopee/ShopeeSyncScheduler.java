@@ -16,10 +16,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Busca automática de ofertas Shopee via Affiliate Open API, no mesmo molde do
- * {@link com.maisofertas.canopy.CanopySyncScheduler} pra Amazon. Desligado por padrão
- * ({@code app.shopee.sync.enabled=false}) até {@code SHOPEE_APP_ID}/{@code SHOPEE_SECRET}
- * estarem configurados e o mapeamento de campos ter sido validado contra a API real (ver aviso
- * em {@link ShopeeClient}).
+ * {@link com.maisofertas.canopy.CanopySyncScheduler} pra Amazon. Contrato validado com uma
+ * chamada real (ver {@link ShopeeClient}). Desligado por padrão ({@code app.shopee.sync.enabled=
+ * false}) até {@code SHOPEE_APP_ID}/{@code SHOPEE_SECRET} estarem configurados - ligar é decisão
+ * de negócio (orçamento de requests, ritmo de posts), não mais uma questão de contrato não
+ * validado.
  */
 @Component
 @ConditionalOnProperty(name = "app.shopee.sync.enabled", havingValue = "true")

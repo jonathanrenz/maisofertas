@@ -198,25 +198,31 @@ mesmo contrato do `POST /deals/manual` (`store: "SHOPEE"`) e do resto do pipelin
 `ai`, `telegram`, `whatsapp` ou `publish` precisou mudar além de trocar o texto fixo "Ver oferta na
 Amazon" pelo nome da loja do deal (`Store.displayName()`).
 
-**Diferença importante em relação à Canopy: o contrato do `ShopeeClient` não foi validado contra uma
-chamada real** (a Canopy foi; ver comentário no fixture de `CanopyClientTest`). O formato foi montado a
-partir da documentação pública da Shopee Affiliate Open API e de um exemplo de terceiro, porque o
-portal oficial (`affiliate.shopee.com.br/open_api`) exige login e não dava pra confirmar sem uma conta
-de verdade. Antes de virar produção:
+**Contrato validado com uma chamada real em 08/ago/2026** (`ShopeeClientLiveSmokeTest`, lane `live`,
+mesmo mecanismo da lane `eval` — fica fora do `mvn test` comum): `priceMin`, `priceDiscountRate`,
+`offerLink`, `imageUrl` e a fórmula `originalPrice = atual / (1 - desconto/100)` bateram exatamente
+com o retorno real da API pra 5 produtos. Pra rodar de novo (ex: depois de qualquer mudança no
+`ShopeeClient`, ou se a Shopee mudar o schema no futuro):
 
-1. Preencha `SHOPEE_APP_ID`/`SHOPEE_SECRET` no `.env` com as credenciais reais (painel
-   `affiliate.shopee.com.br` → Open API).
-2. Suba a app localmente com `SHOPEE_SYNC_ENABLED=true` e `SHOPEE_SYNC_PAGES_PER_RUN=1` e observe o log
-   `Sync Shopee concluído: ...` — se vier um WARN `Resposta da Shopee Affiliate API sem
-   'data.productOfferV2'`, o schema mudou e o `ShopeeClient` precisa de ajuste nos nomes de campo antes
-   de continuar.
-3. Confira no Postgres (`SELECT * FROM deals WHERE store = 'SHOPEE'`) se título, preço, `originalPrice`
-   (calculado como `atual / (1 - desconto/100)` a partir de `priceDiscountRate`) e link (`offerLink`,
-   já com a tag de afiliado embutida pela própria Shopee — `DealService` não mexe na URL de deals que
-   não são `AMAZON`) fazem sentido antes de deixar ligado 24/7.
-4. `SHOPEE_MIN_DISCOUNT_PERCENT` (padrão 20) e `SHOPEE_SYNC_PAGES_PER_RUN`/`SHOPEE_SYNC_INTERVAL_MS`
+```bash
+SHOPEE_APP_ID=... SHOPEE_SECRET=... \
+  ./mvnw test -DexcludedGroups= -Dgroups=live -Dtest=ShopeeClientLiveSmokeTest
+```
+
+Imprime cada oferta buscada (título, preço, `originalPrice`, link) pra conferência visual e falha se
+algum campo essencial vier nulo — sem tocar Postgres, Telegram ou WhatsApp.
+
+Pra ligar de verdade:
+
+1. `SHOPEE_APP_ID`/`SHOPEE_SECRET` no `.env` (painel `affiliate.shopee.com.br` → Open API).
+2. `SHOPEE_SYNC_ENABLED=true`. A partir daí o `ShopeeSyncScheduler` grava deals `PENDING` no Postgres
+   e o `PublishOrchestrator` já existente os publica nos canais reais na próxima rodada — não é mais
+   um teste, é produção. Se só quiser validar antes de publicar de verdade, confira primeiro no
+   Postgres (`SELECT * FROM deals WHERE store = 'SHOPEE'`) com `PUBLISH_INTERVAL_MS` alto o bastante
+   pra dar tempo de olhar.
+3. `SHOPEE_MIN_DISCOUNT_PERCENT` (padrão 20) e `SHOPEE_SYNC_PAGES_PER_RUN`/`SHOPEE_SYNC_INTERVAL_MS`
    funcionam como no Canopy — calcule o consumo de requests do seu plano antes de aumentar qualquer um.
-5. `SHOPEE_KEYWORD` vazio busca o catálogo geral (sem filtro de termo); `SHOPEE_SORT_TYPE` (padrão `5`
+4. `SHOPEE_KEYWORD` vazio busca o catálogo geral (sem filtro de termo); `SHOPEE_SORT_TYPE` (padrão `5`
    = maior comissão) aceita `1` (relevância), `2` (mais vendidos), `3` (maior preço) e `4` (menor preço)
    — nenhum ordena por desconto direto, então o filtro de qualidade real é o `SHOPEE_MIN_DISCOUNT_PERCENT`
    aplicado depois.

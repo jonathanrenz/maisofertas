@@ -21,15 +21,13 @@ import tools.jackson.databind.ObjectMapper;
  * Busca ofertas Shopee via <a href="https://affiliate.shopee.com.br/open_api">Shopee
  * Affiliate Open API</a> (GraphQL, {@code POST /graphql}, query {@code productOfferV2}).
  *
- * <p><b>Contrato não validado contra uma chamada real:</b> ao contrário da
- * {@link com.maisofertas.canopy.CanopyClient} (cujo fixture de teste veio de uma resposta
- * real da API), o formato abaixo foi montado a partir da documentação pública disponível e de
- * um exemplo de terceiro (não foi possível confirmar direto no portal oficial, que exige login).
- * Antes de ligar {@code app.shopee.sync.enabled=true} em produção, rode uma sincronização local
- * com {@code SHOPEE_APP_ID}/{@code SHOPEE_SECRET} reais e confira nos logs/no banco se os deals
- * criados fazem sentido (título, preço, link). Se a Shopee tiver renomeado algum campo, o sintoma
- * mais provável é {@code fetchDeals} devolver lista vazia (ver {@link #fetchDeals}) ou os deals
- * virem com {@code originalPrice} nulo mesmo em oferta com desconto.
+ * <p>Contrato validado com uma chamada real em 08/ago/2026 via {@code ShopeeClientLiveSmokeTest}
+ * (lane {@code live}, fora do {@code mvn test} comum): {@code priceMin}, {@code priceDiscountRate},
+ * {@code offerLink} e a fórmula de {@code originalPrice} bateram exatamente com o que a API
+ * devolveu. Se a Shopee renomear algum campo no futuro, o sintoma mais provável é {@code fetchDeals}
+ * devolver lista vazia (ver {@link #fetchDeals}, que loga WARN nesse caso) ou deals com
+ * {@code originalPrice} nulo mesmo em oferta com desconto - rode a lane {@code live} de novo pra
+ * confirmar antes de investigar mais fundo.
  */
 @Component
 public class ShopeeClient {
