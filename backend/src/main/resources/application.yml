@@ -41,3 +41,15 @@ app:
       enabled: ${CANOPY_SYNC_ENABLED:false}
       interval-ms: ${CANOPY_SYNC_INTERVAL_MS:28800000}
       pages-per-run: ${CANOPY_SYNC_PAGES_PER_RUN:1}
+  shopee:
+    base-url: ${SHOPEE_BASE_URL:https://open-api.affiliate.shopee.com.br/graphql}
+    app-id: ${SHOPEE_APP_ID:}
+    secret: ${SHOPEE_SECRET:}
+    keyword: ${SHOPEE_KEYWORD:}
+    sort-type: ${SHOPEE_SORT_TYPE:5}
+    min-discount-percent: ${SHOPEE_MIN_DISCOUNT_PERCENT:20}
+    sync:
+      enabled: ${SHOPEE_SYNC_ENABLED:false}
+      interval-ms: ${SHOPEE_SYNC_INTERVAL_MS:28800000}
+      pages-per-run: ${SHOPEE_SYNC_PAGES_PER_RUN:1}
+      limit-per-page: ${SHOPEE_SYNC_LIMIT_PER_PAGE:20}

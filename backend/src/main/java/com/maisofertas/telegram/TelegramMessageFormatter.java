@@ -37,7 +37,8 @@ public class TelegramMessageFormatter {
 
         sb.append(priceLine(deal)).append("\n\n");
 
-        sb.append("🛒 [*Ver oferta na Amazon*](").append(escapeUrl(deal.getUrl())).append(')');
+        sb.append("🛒 [*Ver oferta na ").append(escape(deal.getStore().displayName())).append("*](")
+                .append(escapeUrl(deal.getUrl())).append(')');
 
         return sb.toString();
     }

@@ -32,7 +32,8 @@ public class WhatsAppMessageFormatter {
 
         sb.append(priceLine(deal)).append("\n\n");
 
-        sb.append("🛒 *Ver oferta na Amazon:*\n").append(deal.getUrl());
+        sb.append("🛒 *Ver oferta na ").append(sanitize(deal.getStore().displayName())).append(":*\n")
+                .append(deal.getUrl());
 
         return sb.toString();
     }

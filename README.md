@@ -1,6 +1,6 @@
 # Mais Ofertas
 
-Backend que capta ofertas (começando pela Amazon), gera legenda com IA e publica automaticamente num canal de Telegram e num grupo de WhatsApp (via Evolution API), monetizando por link de afiliado.
+Backend que capta ofertas (Amazon e Shopee), gera legenda com IA e publica automaticamente num canal de Telegram e num grupo de WhatsApp (via Evolution API), monetizando por link de afiliado.
 
 ## Arquitetura
 
@@ -10,12 +10,14 @@ maisofertas/
   infra/       # docker-compose (app + postgres + redis + evolution-api)
 ```
 
-Pipeline: `POST /deals/manual` (Fase 0) ou sync automático via Canopy API (Fase 1, desligado até a
-key estar configurada) → grava no Postgres com dedup → a cada `PUBLISH_INTERVAL_MS`, gera conteúdo
-estruturado (hook + nome do produto + specs) via OpenAI, com fallback determinístico se a IA falhar →
-cada canal formata a própria mensagem (preço, desconto e link são sempre calculados de forma
-determinística, nunca pela IA) → publica no Telegram (MarkdownV2, com texto riscado de verdade no preço
-"de") e no WhatsApp (marcação nativa), cada canal marcado como postado independentemente.
+Pipeline: `POST /deals/manual` (Fase 0, qualquer loja) ou sync automático via Canopy API (Fase 1,
+Amazon) / Shopee Affiliate Open API (Fase 2, ambas desligadas até a key estar configurada) → grava
+no Postgres com dedup → a cada `PUBLISH_INTERVAL_MS`, gera conteúdo estruturado (hook + nome do
+produto + specs) via OpenAI, com fallback determinístico se a IA falhar → cada canal formata a
+própria mensagem (preço, desconto e link são sempre calculados de forma determinística, nunca pela
+IA, com o nome da loja certo - "Ver oferta na Amazon"/"Ver oferta na Shopee") → publica no Telegram
+(MarkdownV2, com texto riscado de verdade no preço "de") e no WhatsApp (marcação nativa), cada canal
+marcado como postado independentemente.
 
 **Por que Fase 0 é manual (e por que Canopy, não a API oficial da Amazon):** a PA-API da Amazon foi
 desativada em 15/mai/2026. O substituto (Creators API) só libera acesso com 10 vendas qualificadas nos
@@ -35,8 +37,9 @@ que o Fase 1 preenche sozinho, então nada no resto do pipeline muda quando a sy
 | `telegram` | `TelegramBotClient` — Bot API via REST direto (`parse_mode=MarkdownV2`) — e `TelegramMessageFormatter`, que monta a mensagem e escapa os caracteres reservados do MarkdownV2 |
 | `whatsapp` | `EvolutionApiClient` — instância self-hosted do Evolution API — e `WhatsAppMessageFormatter`, que monta a mensagem com a marcação nativa do WhatsApp (`*negrito*`, `~riscado~`) |
 | `publish` | `PublishOrchestrator` — `@Scheduled`, gera o conteúdo uma vez e publica pendentes, idempotente por canal, cada canal com sua própria formatação |
-| `amazon` | `AmazonController` — `POST /deals/manual` (Fase 0) |
-| `canopy` | `CanopyClient` (REST, `GET /api/amazon/deals`) e `CanopySyncScheduler` (Fase 1, `@Scheduled`, desligado por padrão) |
+| `amazon` | `AmazonController` — `POST /deals/manual` (Fase 0, aceita qualquer `store`) |
+| `canopy` | `CanopyClient` (REST, `GET /api/amazon/deals`) e `CanopySyncScheduler` (Fase 1, Amazon, `@Scheduled`, desligado por padrão) |
+| `shopee` | `ShopeeClient` (GraphQL, `POST /graphql`, query `productOfferV2`, autenticação HMAC-SHA256) e `ShopeeSyncScheduler` (Fase 2, Shopee, `@Scheduled`, desligado por padrão) |
 
 ## Rodando localmente
 
@@ -45,7 +48,7 @@ Pré-requisito: Java 21+ (o projeto foi gerado/testado com JDK 26 instalado em
 
 ```bash
 cd backend
-./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 46 testes
+./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 60 testes
 ./mvnw spring-boot:run          # sobe a app (precisa de Postgres - veja infra/)
 ```
 
@@ -80,7 +83,7 @@ vazio, no máximo 4 specs, sem placeholder vazando) e exige >=90% de aprovação
 pulado (não falha o build).
 
 > A suíte completa `mvn test` (sem filtro) também inclui `MaisofertasBackendApplicationTests`, que sobe
-> um Postgres real via Testcontainers — precisa do Docker Desktop rodando. Os outros 45 gate tests dos
+> um Postgres real via Testcontainers — precisa do Docker Desktop rodando. Os outros 59 gate tests dos
 > pacotes acima **não** precisam de Docker.
 
 ## Testando o fluxo manual ponta a ponta
@@ -104,7 +107,8 @@ dias) retorna `409 Conflict`.
 
 ## Variáveis de ambiente
 
-Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram, Evolution API e Canopy.
+Ver `infra/.env.example` — cobre banco, dedup/agendamento, OpenAI, Telegram, Evolution API, Canopy e
+Shopee.
 
 ## Antes de ir pra produção (checklist da Fase 0)
 
@@ -186,3 +190,48 @@ Redis e a sessão do Evolution API continuam com os volumes/dados existentes.
 Nada em `deals`, `ai`, `telegram`, `whatsapp` ou `publish` precisa mudar — o `CanopySyncScheduler` só
 chama `DealService.createDeal(request, DealSource.CANOPY)`, mesmo contrato que o `POST /deals/manual`
 já usa.
+
+## Fase 2 (sync automático via Shopee Affiliate Open API)
+
+Mesmo padrão da Fase 1: `ShopeeSyncScheduler` chama `DealService.createDeal(request, DealSource.SHOPEE)`,
+mesmo contrato do `POST /deals/manual` (`store: "SHOPEE"`) e do resto do pipeline — nada em `deals`,
+`ai`, `telegram`, `whatsapp` ou `publish` precisou mudar além de trocar o texto fixo "Ver oferta na
+Amazon" pelo nome da loja do deal (`Store.displayName()`).
+
+**Diferença importante em relação à Canopy: o contrato do `ShopeeClient` não foi validado contra uma
+chamada real** (a Canopy foi; ver comentário no fixture de `CanopyClientTest`). O formato foi montado a
+partir da documentação pública da Shopee Affiliate Open API e de um exemplo de terceiro, porque o
+portal oficial (`affiliate.shopee.com.br/open_api`) exige login e não dava pra confirmar sem uma conta
+de verdade. Antes de virar produção:
+
+1. Preencha `SHOPEE_APP_ID`/`SHOPEE_SECRET` no `.env` com as credenciais reais (painel
+   `affiliate.shopee.com.br` → Open API).
+2. Suba a app localmente com `SHOPEE_SYNC_ENABLED=true` e `SHOPEE_SYNC_PAGES_PER_RUN=1` e observe o log
+   `Sync Shopee concluído: ...` — se vier um WARN `Resposta da Shopee Affiliate API sem
+   'data.productOfferV2'`, o schema mudou e o `ShopeeClient` precisa de ajuste nos nomes de campo antes
+   de continuar.
+3. Confira no Postgres (`SELECT * FROM deals WHERE store = 'SHOPEE'`) se título, preço, `originalPrice`
+   (calculado como `atual / (1 - desconto/100)` a partir de `priceDiscountRate`) e link (`offerLink`,
+   já com a tag de afiliado embutida pela própria Shopee — `DealService` não mexe na URL de deals que
+   não são `AMAZON`) fazem sentido antes de deixar ligado 24/7.
+4. `SHOPEE_MIN_DISCOUNT_PERCENT` (padrão 20) e `SHOPEE_SYNC_PAGES_PER_RUN`/`SHOPEE_SYNC_INTERVAL_MS`
+   funcionam como no Canopy — calcule o consumo de requests do seu plano antes de aumentar qualquer um.
+5. `SHOPEE_KEYWORD` vazio busca o catálogo geral (sem filtro de termo); `SHOPEE_SORT_TYPE` (padrão `5`
+   = maior comissão) aceita `1` (relevância), `2` (mais vendidos), `3` (maior preço) e `4` (menor preço)
+   — nenhum ordena por desconto direto, então o filtro de qualidade real é o `SHOPEE_MIN_DISCOUNT_PERCENT`
+   aplicado depois.
+
+Testar manualmente um deal Shopee sem esperar o sync (mesmo endpoint da Fase 0, só troca o `store`):
+
+```bash
+curl -X POST http://localhost:8081/deals/manual \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Fone de Ouvido Bluetooth TWS",
+    "url": "https://s.shopee.com.br/exemplo",
+    "imageUrl": "https://cf.shopee.com.br/file/exemplo.jpg",
+    "price": 65.00,
+    "originalPrice": 100.00,
+    "store": "SHOPEE"
+  }'
+```

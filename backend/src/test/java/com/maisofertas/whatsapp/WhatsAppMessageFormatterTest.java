@@ -72,6 +72,16 @@ class WhatsAppMessageFormatterTest {
     }
 
     @Test
+    void usaONomeDaLojaCorrespondenteNoLinkDaOferta() {
+        Deal deal = baseDeal().store(Store.SHOPEE).price(BigDecimal.TEN).build();
+        DealContent content = new DealContent("🔥 Hook", "Produto", List.of());
+
+        String message = formatter.format(deal, content);
+
+        assertThat(message).contains("🛒 *Ver oferta na Shopee:*\n");
+    }
+
+    @Test
     void removeCaracteresDeMarkupSoltosDoTextoDinamicoParaNaoQuebrarFormatacao() {
         DealContent content = new DealContent("🔥 Hook com * asterisco solto", "Nome_com_underscore",
                 List.of("spec ~com til~", "spec `com crase`"));

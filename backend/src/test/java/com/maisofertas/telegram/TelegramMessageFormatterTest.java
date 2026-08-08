@@ -81,6 +81,16 @@ class TelegramMessageFormatterTest {
     }
 
     @Test
+    void usaONomeDaLojaCorrespondenteNoLinkDaOferta() {
+        Deal deal = baseDeal().store(Store.SHOPEE).price(BigDecimal.TEN).build();
+        DealContent content = new DealContent("🔥 Hook", "Produto", List.of());
+
+        String message = formatter.format(deal, content);
+
+        assertThat(message).contains("🛒 [*Ver oferta na Shopee*]");
+    }
+
+    @Test
     void escapaApenasFechaParenteseEBarraInvertidaDentroDoLink() {
         // MarkdownV2 só exige escapar ')' e '\' dentro do (url) de um link - '(' fica como está.
         Deal deal = baseDeal().url("https://amazon.com.br/dp/ABC?tag=x-20&note=(a)").price(BigDecimal.TEN).build();

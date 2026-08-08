@@ -4,5 +4,6 @@ public enum DealSource {
     MANUAL,
     CREATORS_API,
     KEEPA,
-    CANOPY
+    CANOPY,
+    SHOPEE
 }
