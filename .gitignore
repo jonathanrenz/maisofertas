@@ -1,3 +1,5 @@
 infra/.env
 *.env
 !infra/.env.example
+
+.claude/
