@@ -49,8 +49,11 @@ Pré-requisito: Java 21+ (o projeto foi gerado/testado com JDK 26 instalado em
 ```bash
 cd backend
 ./mvnw test                    # gate tests (rápidos, sem chamada real de API) - ~1s, 60 testes
-./mvnw spring-boot:run          # sobe a app (precisa de Postgres - veja infra/)
+DB_PASSWORD=... ./mvnw spring-boot:run   # sobe a app (precisa de Postgres - veja infra/)
 ```
+
+`DB_PASSWORD` é sempre obrigatória (sem default) - o gate tests não precisa dela porque usa Testcontainers
+(`TestcontainersConfiguration`, credenciais geradas por container).
 
 ### Subindo a stack completa (Postgres + Redis + Evolution API + app)
 
