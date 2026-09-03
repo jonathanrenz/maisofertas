@@ -125,34 +125,28 @@ Shopee.
 4. VPS com Docker pra rodar 24/7 — feito, ver [Deploy na VPS](#deploy-na-vps) abaixo.
 5. Chave da OpenAI → `OPENAI_API_KEY`. Sem ela, o app funciona normalmente com o fallback determinístico.
 
-## Deploy na VPS
+## Deploy em produção
 
-Stack roda em `deploy@<ip-da-vps>:~/maisofertas` via Docker Compose, perfil `whatsapp` sempre ligado
-(Telegram + WhatsApp). O usuário `deploy` está no grupo `docker` e tem sudo sem senha; o Docker do
-host já inicia no boot (`systemctl enable docker`), e cada container sobe com `restart: unless-stopped`
-— não precisa de systemd unit própria.
+Stack pensada pra rodar 24/7 numa VPS qualquer via Docker Compose, perfil `whatsapp` ligado quando o
+canal de WhatsApp estiver ativo (Telegram sozinho não precisa dele). Cada container sobe com
+`restart: unless-stopped`, então sobrevive a reboot sem precisar de systemd unit própria — só o Docker
+do host precisa iniciar no boot (`systemctl enable docker`).
 
-O repo é privado, então o clone na VPS usa uma **deploy key read-only** dedicada
-(`~/.ssh/maisofertas_deploy_key`, alias `github-maisofertas` no `~/.ssh/config` do usuário `deploy`),
-cadastrada nas Deploy Keys do repo no GitHub. Ela só permite `git pull`, nunca push.
-
-Portas: só 22/80/443 estão liberadas no firewall (`ufw`) da VPS — a mesma VPS já hospeda outra
-aplicação (nginx + certbot ocupando 80/443). As portas do compose (8081 app, 8082 Evolution API
-manager) ficam só em loopback/rede interna do Docker; não são expostas à internet. Pra acessar o
-manager do Evolution API (ex: reconectar o WhatsApp depois de um logout), abra um túnel SSH:
+As portas do Compose (app e o manager do Evolution API) não precisam ficar expostas à internet: deixe
+só a porta da própria app (ou um reverse proxy na frente dela) liberada no firewall, e acesse o manager
+do Evolution API por um túnel SSH quando precisar reconectar o WhatsApp (ex: depois de um logout):
 
 ```bash
-ssh -N -L 8082:localhost:8082 deploy@<ip-da-vps>
+ssh -N -L 8082:localhost:8082 usuario@sua-vps
 # depois abra http://localhost:8082/manager no navegador local
 ```
 
-### Deploy inicial (já feito)
+### Deploy inicial
 
 ```bash
-ssh deploy@<ip-da-vps>
-git clone git@github-maisofertas:jonathanrenz/maisofertas.git ~/maisofertas
-# copiar infra/.env local (com os secrets reais) pro mesmo caminho na VPS via scp, chmod 600
-cd ~/maisofertas/infra
+git clone https://github.com/jonathanrenz/maisofertas.git
+cd maisofertas/infra
+cp .env.example .env            # preencha com os secrets reais, nunca commite
 docker compose --profile whatsapp up -d --build
 ```
 
@@ -163,8 +157,7 @@ escanear com o WhatsApp que já está no grupo de ofertas alvo (`EVOLUTION_GROUP
 ### Atualizar (deploys seguintes)
 
 ```bash
-ssh deploy@<ip-da-vps>
-cd ~/maisofertas
+cd maisofertas
 git pull
 cd infra
 docker compose --profile whatsapp up -d --build
